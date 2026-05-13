@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>水龍吟娃娃機計數器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0F1419;
+    --surface: #1A2028;
+    --surface-2: #232A33;
+    --surface-3: #2D353F;
+    --border: #2D353F;
+    --border-strong: #3D4651;
+    --text: #E8EAED;
+    --text-dim: #9AA0A6;
+    --text-muted: #5F6368;
+    --accent: #F59E0B;
+    --accent-dim: #92400E;
+    --left: #8B5CF6;
+    --right: #10B981;
+    --big: #EF4444;
+    --danger: #DC2626;
+    --success: #059669;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans TC', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  .container { max-width: 1280px; margin: 0 auto; }
+  .num { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  h1::before {
+    content: '';
+    width: 4px;
+    height: 28px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .subtitle { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  button, .btn {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  button:hover { background: var(--surface-3); border-color: var(--border-strong); }
+  button.primary { background: var(--accent); color: #1A1208; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { background: #FBB02C; }
+  button.danger { color: #FCA5A5; }
+  button.danger:hover { background: rgba(220, 38, 38, 0.15); border-color: var(--danger); color: #FECACA; }
+  button.ghost { background: transparent; }
+  button.icon-only { padding: 6px 8px; }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-label { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; letter-spacing: 0.02em; }
+  .card-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+  .card-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .card.accent { border-color: var(--accent-dim); }
+  .card.accent::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 60px; height: 60px;
+    background: radial-gradient(circle at top right, rgba(245, 158, 11, 0.15), transparent 70%);
+    pointer-events: none;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .panel-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .panel-body { padding: 18px; }
+
+  .segs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .seg-btn:hover { background: var(--surface-3); }
+  .seg-btn.active { background: var(--accent); color: #1A1208; border-color: var(--accent); font-weight: 600; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px 12px; text-align: right; white-space: nowrap; }
+  th { font-weight: 500; color: var(--text-dim); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; background: var(--surface-2); }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+  th:first-child { background: var(--surface-2); }
+  tbody tr { border-top: 1px solid var(--border); }
+  tbody tr:hover { background: var(--surface-2); }
+  tbody tr:hover td:first-child { background: var(--surface-2); }
+  td.group-left { color: var(--left); }
+  td.group-right { color: var(--right); }
+  td.group-big { color: var(--big); }
+  th.group-left { color: var(--left); }
+  th.group-right { color: var(--right); }
+  th.group-big { color: var(--big); }
+  .total-row { background: var(--surface-2); font-weight: 600; border-top: 2px solid var(--border-strong) !important; }
+  .total-row td:first-child { background: var(--surface-2); }
+
+  .reading-input {
+    width: 80px;
+    padding: 4px 8px;
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    text-align: right;
+    transition: all 0.15s;
+  }
+  .reading-input:hover { border-color: var(--border); }
+  .reading-input:focus { border-color: var(--accent); outline: none; background: var(--bg); }
+  .date-input {
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    color-scheme: dark;
+  }
+  .date-input:focus { border-color: var(--accent); outline: none; }
+
+  .row-actions { display: flex; gap: 4px; justify-content: flex-end; }
+  .row-actions button { padding: 4px 6px; font-size: 11px; }
+
+  .chart-wrap { position: relative; height: 320px; width: 100%; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text-dim); margin-bottom: 12px; }
+  .legend-dot { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-dot::before {
+    content: '';
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    background: var(--bullet);
+  }
+  .l-left { --bullet: var(--left); }
+  .l-right { --bullet: var(--right); }
+  .l-big { --bullet: var(--big); }
+
+  .config-grid { display: grid; grid-template-columns: 1fr 80px 40px; gap: 8px; align-items: center; }
+  .config-input {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    width: 100%;
+  }
+  .config-input:focus { border-color: var(--accent); outline: none; }
+  .config-label { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+
+  .machine-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .group-pill {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--surface-3);
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .group-pill.group-left { background: rgba(139, 92, 246, 0.15); color: var(--left); }
+  .group-pill.group-right { background: rgba(16, 185, 129, 0.15); color: var(--right); }
+  .group-pill.group-big { background: rgba(239, 68, 68, 0.15); color: var(--big); }
+
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 24px; }
+  details summary { padding: 14px 18px; cursor: pointer; font-weight: 600; font-size: 14px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  details summary::after { content: '＋'; color: var(--text-dim); }
+  details[open] summary::after { content: '－'; }
+  details summary::-webkit-details-marker { display: none; }
+  details > div { padding: 0 18px 18px; border-top: 1px solid var(--border); padding-top: 16px; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface-3);
+    color: var(--text);
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    font-size: 13px;
+    opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 640px) {
+    body { padding: 16px 8px; }
+    h1 { font-size: 22px; }
+    .card-value { font-size: 22px; }
+    th, td { padding: 8px; }
+    .reading-input { width: 64px; font-size: 12px; }
+  }
+
+  @media print {
+    body { background: white; color: black; }
+    .panel, .card { background: white; border-color: #ccc; }
+    .actions, .row-actions, button, details { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div>
+      <h1>水龍吟娃娃機計數器</h1>
+      <div class="subtitle">10 台機台 · 每計數 <span id="price-display" class="num">10</span> 元 · <span id="store-name">水龍吟門市</span></div>
+    </div>
+    <div class="actions">
+      <button onclick="exportData()" title="匯出 JSON 備份">↓ 匯出</button>
+      <button onclick="document.getElementById('import-file').click()" title="匯入 JSON 檔案">↑ 匯入</button>
+      <input id="import-file" type="file" accept="application/json" style="display:none" onchange="importData(event)">
+      <button onclick="window.print()">列印</button>
+      <button class="danger" onclick="resetAll()">重置</button>
+    </div>
+  </header>
+
+  <div class="cards">
+    <div class="card accent">
+      <div class="card-label">最新一期營收</div>
+      <div class="card-value num">NT$<span id="latest-revenue">0</span></div>
+      <div class="card-meta" id="latest-period">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">期間累計營收</div>
+      <div class="card-value num">NT$<span id="total-revenue">0</span></div>
+      <div class="card-meta" id="total-period">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">累計計數差</div>
+      <div class="card-value num"><span id="total-counts">0</span></div>
+      <div class="card-meta">10 台機台合計</div>
+    </div>
+    <div class="card">
+      <div class="card-label">日均營收</div>
+      <div class="card-value num">NT$<span id="daily-avg">0</span></div>
+      <div class="card-meta" id="daily-meta">—</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">📊 各機台營收</div>
+      <div class="segs" id="segs"></div>
+    </div>
+    <div class="panel-body">
+      <div class="legend">
+        <span class="legend-dot l-left">左邊機台 A072</span>
+        <span class="legend-dot l-right">右邊機台 A073</span>
+        <span class="legend-dot l-big">大機台</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">📋 計數器讀數登錄</div>
+      <div class="actions">
+        <button class="primary" onclick="addReading()">+ 新增一期</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="readings-table">
+        <thead><tr id="readings-head"></tr></thead>
+        <tbody id="readings-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header"><div class="panel-title">💰 機台明細</div></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">機台</th>
+            <th>起 (期初)</th>
+            <th>迄 (最新)</th>
+            <th>計數差</th>
+            <th>營收</th>
+            <th>占比</th>
+          </tr>
+        </thead>
+        <tbody id="detail-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <details>
+    <summary>⚙️ 設定（機台名稱、計數單價、門市名稱）</summary>
+    <div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px;">
+        <div>
+          <div class="config-label">門市名稱</div>
+          <input id="cfg-store" class="config-input" value="水龍吟門市">
+        </div>
+        <div>
+          <div class="config-label">每計數金額 (NT$)</div>
+          <input id="cfg-price" class="config-input" type="number" min="1" value="10">
+        </div>
+      </div>
+      <div class="config-label">機台清單（拖曳 = 排序，左邊／右邊／大機台 三組）</div>
+      <div id="machine-config"></div>
+      <button class="primary" onclick="saveConfig()" style="margin-top: 12px;">儲存設定</button>
+    </div>
+  </details>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// 預設資料
+// ============================================================
+const DEFAULT_MACHINES = [
+  { id: 'm1', name: '左邊機台 A072L上', group: 'left' },
+  { id: 'm2', name: '左邊機台 A072R上', group: 'left' },
+  { id: 'm3', name: '左邊機台 A072L下', group: 'left' },
+  { id: 'm4', name: '左邊機台 A072R下', group: 'left' },
+  { id: 'm5', name: '右邊機台 A073L上', group: 'right' },
+  { id: 'm6', name: '右邊機台 A073R上', group: 'right' },
+  { id: 'm7', name: '右邊機台 A073L下', group: 'right' },
+  { id: 'm8', name: '右邊機台 A073R下', group: 'right' },
+  { id: 'm9', name: '大機台左', group: 'big' },
+  { id: 'm10', name: '大機台右', group: 'big' },
+];
+
+const DEFAULT_READINGS = [
+  { date: '2026-05-01', values: { m1:634, m2:469, m3:831, m4:662, m5:118, m6:134, m7:116, m8:184, m9:60827, m10:30950 } },
+  { date: '2026-05-04', values: { m1:649, m2:470, m3:853, m4:697, m5:146, m6:197, m7:135, m8:194, m9:60872, m10:30950 } },
+  { date: '2026-05-08', values: { m1:668, m2:484, m3:883, m4:736, m5:183, m6:213, m7:171, m8:230, m9:60936, m10:30976 } },
+  { date: '2026-05-11', values: { m1:699, m2:530, m3:923, m4:778, m5:195, m6:282, m7:207, m8:235, m9:61000, m10:30988 } },
+  { date: '2026-05-13', values: { m1:721, m2:542, m3:923, m4:789, m5:198, m6:307, m7:246, m8:246, m9:61016, m10:30990 } },
+];
+
+const STORAGE_KEY = 'water_dragon_claw_v1';
+
+// ============================================================
+// 狀態管理
+// ============================================================
+let state = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.warn('localStorage load failed', e); }
+  return {
+    storeName: '水龍吟門市',
+    pricePerCount: 10,
+    machines: JSON.parse(JSON.stringify(DEFAULT_MACHINES)),
+    readings: JSON.parse(JSON.stringify(DEFAULT_READINGS)),
+    activeSeg: 'total',
+  };
+}
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch (e) { toast('儲存失敗：' + e.message); }
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ============================================================
+// 計算邏輯
+// ============================================================
+function sortedReadings() {
+  return [...state.readings].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function daysBetween(d1, d2) {
+  return Math.max(1, Math.round((new Date(d2) - new Date(d1)) / 86400000));
+}
+
+function computeSegment(segIdx) {
+  const sr = sortedReadings();
+  if (sr.length < 2) return null;
+  let from, to, days;
+  if (segIdx === 'total') {
+    from = sr[0]; to = sr[sr.length - 1];
+    days = daysBetween(from.date, to.date);
+  } else {
+    from = sr[segIdx]; to = sr[segIdx + 1];
+    days = daysBetween(from.date, to.date);
+  }
+  const perMachine = state.machines.map(m => {
+    const f = from.values[m.id] || 0;
+    const t = to.values[m.id] || 0;
+    const diff = t - f;
+    return { machine: m, from: f, to: t, diff, revenue: diff * state.pricePerCount };
+  });
+  const totalCounts = perMachine.reduce((s, x) => s + x.diff, 0);
+  const totalRevenue = totalCounts * state.pricePerCount;
+  return { from, to, days, perMachine, totalCounts, totalRevenue };
+}
+
+// ============================================================
+// 渲染：頂部卡片
+// ============================================================
+function renderCards() {
+  const sr = sortedReadings();
+  if (sr.length < 2) {
+    document.getElementById('latest-revenue').textContent = '0';
+    document.getElementById('total-revenue').textContent = '0';
+    document.getElementById('total-counts').textContent = '0';
+    document.getElementById('daily-avg').textContent = '0';
+    document.getElementById('latest-period').textContent = '需要至少 2 期讀數';
+    document.getElementById('total-period').textContent = '—';
+    document.getElementById('daily-meta').textContent = '—';
+    return;
+  }
+  const latest = computeSegment(sr.length - 2);
+  const total = computeSegment('total');
+  document.getElementById('latest-revenue').textContent = latest.totalRevenue.toLocaleString();
+  document.getElementById('latest-period').textContent =
+    fmtDate(latest.from.date) + ' → ' + fmtDate(latest.to.date) + ` (${latest.days} 日)`;
+  document.getElementById('total-revenue').textContent = total.totalRevenue.toLocaleString();
+  document.getElementById('total-period').textContent =
+    fmtDate(total.from.date) + ' → ' + fmtDate(total.to.date) + ` (${total.days} 日)`;
+  document.getElementById('total-counts').textContent = total.totalCounts.toLocaleString();
+  document.getElementById('daily-avg').textContent = Math.round(total.totalRevenue / total.days).toLocaleString();
+  document.getElementById('daily-meta').textContent = `累計 ${total.days} 日平均`;
+}
+
+function fmtDate(d) {
+  const parts = d.split('-');
+  return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+}
+
+// ============================================================
+// 渲染：分段切換按鈕
+// ============================================================
+function renderSegs() {
+  const sr = sortedReadings();
+  const segs = document.getElementById('segs');
+  segs.innerHTML = '';
+  if (sr.length < 2) return;
+  const totalBtn = makeSegBtn('total', '期間總計');
+  segs.appendChild(totalBtn);
+  for (let i = 0; i < sr.length - 1; i++) {
+    segs.appendChild(makeSegBtn(i, `${fmtDate(sr[i].date)} → ${fmtDate(sr[i+1].date)}`));
+  }
+}
+function makeSegBtn(idx, label) {
+  const b = document.createElement('button');
+  b.className = 'seg-btn' + (String(state.activeSeg) === String(idx) ? ' active' : '');
+  b.textContent = label;
+  b.onclick = () => { state.activeSeg = idx; save(); renderChart(); renderDetail(); renderSegs(); };
+  return b;
+}
+
+// ============================================================
+// 渲染：圖表
+// ============================================================
+let chart;
+function renderChart() {
+  const seg = state.activeSeg === 'total' ? 'total' : parseInt(state.activeSeg);
+  const data = computeSegment(seg);
+  const ctx = document.getElementById('chart');
+  if (!data) {
+    if (chart) chart.destroy();
+    return;
+  }
+  const labels = data.perMachine.map(x => x.machine.name.replace(/邊機台 /, ''));
+  const values = data.perMachine.map(x => x.revenue);
+  const colors = data.perMachine.map(x => {
+    if (x.machine.group === 'left') return '#8B5CF6';
+    if (x.machine.group === 'right') return '#10B981';
+    return '#EF4444';
+  });
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderRadius: 6, borderSkipped: false }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1A2028', borderColor: '#3D4651', borderWidth: 1, padding: 10,
+          titleColor: '#E8EAED', bodyColor: '#E8EAED',
+          callbacks: {
+            title: items => data.perMachine[items[0].dataIndex].machine.name,
+            label: c => {
+              const item = data.perMachine[c.dataIndex];
+              return [`計數差：+${item.diff}`, `營收：NT$${item.revenue.toLocaleString()}`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#9AA0A6', autoSkip: false, maxRotation: 45, font: { size: 11 } },
+          grid: { display: false },
+        },
+        y: {
+          ticks: { color: '#9AA0A6', callback: v => 'NT$' + v.toLocaleString(), font: { size: 11 } },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// 渲染：讀數登錄表
+// ============================================================
+function renderReadings() {
+  const head = document.getElementById('readings-head');
+  const body = document.getElementById('readings-body');
+  head.innerHTML = '';
+  body.innerHTML = '';
+
+  const dateTh = document.createElement('th');
+  dateTh.textContent = '日期';
+  dateTh.style.textAlign = 'left';
+  head.appendChild(dateTh);
+  state.machines.forEach(m => {
+    const th = document.createElement('th');
+    th.textContent = m.name.replace(/邊機台 /, '');
+    th.className = 'group-' + m.group;
+    th.title = m.name;
+    head.appendChild(th);
+  });
+  const actTh = document.createElement('th');
+  actTh.textContent = '';
+  head.appendChild(actTh);
+
+  const sr = sortedReadings();
+  if (sr.length === 0) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = state.machines.length + 2;
+    td.className = 'empty-state';
+    td.textContent = '尚無讀數，點「新增一期」開始記錄。';
+    tr.appendChild(td);
+    body.appendChild(tr);
+    return;
+  }
+
+  sr.forEach((r, idx) => {
+    const tr = document.createElement('tr');
+    const dateTd = document.createElement('td');
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.className = 'date-input';
+    dateInput.value = r.date;
+    dateInput.onchange = e => { r.date = e.target.value; save(); renderAll(); };
+    dateTd.appendChild(dateInput);
+    if (idx === 0) {
+      const tag = document.createElement('span');
+      tag.textContent = ' 期初';
+      tag.style.fontSize = '10px';
+      tag.style.color = 'var(--text-muted)';
+      tag.style.marginLeft = '4px';
+      dateTd.appendChild(tag);
+    }
+    tr.appendChild(dateTd);
+
+    state.machines.forEach(m => {
+      const td = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'reading-input';
+      input.value = r.values[m.id] ?? '';
+      input.onchange = e => {
+        const v = parseInt(e.target.value);
+        r.values[m.id] = isNaN(v) ? 0 : v;
+        save(); renderCards(); renderChart(); renderDetail();
+      };
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+
+    const actTd = document.createElement('td');
+    actTd.className = 'row-actions';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'danger icon-only';
+    delBtn.textContent = '✕';
+    delBtn.title = '刪除此期讀數';
+    delBtn.onclick = () => {
+      if (confirm(`確定刪除 ${fmtDate(r.date)} 的讀數？`)) {
+        state.readings = state.readings.filter(x => x !== r);
+        save(); renderAll();
+      }
+    };
+    actTd.appendChild(delBtn);
+    tr.appendChild(actTd);
+
+    body.appendChild(tr);
+  });
+}
+
+// ============================================================
+// 渲染：機台明細表
+// ============================================================
+function renderDetail() {
+  const body = document.getElementById('detail-body');
+  body.innerHTML = '';
+  const data = computeSegment(state.activeSeg === 'total' ? 'total' : parseInt(state.activeSeg));
+  if (!data) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 6;
+    td.className = 'empty-state';
+    td.textContent = '需要至少 2 期讀數才能計算。';
+    tr.appendChild(td);
+    body.appendChild(tr);
+    return;
+  }
+
+  data.perMachine.forEach(item => {
+    const tr = document.createElement('tr');
+    const pct = data.totalRevenue ? (item.revenue / data.totalRevenue * 100).toFixed(1) : '0.0';
+    tr.innerHTML = `
+      <td class="group-${item.machine.group}" style="font-weight:500">${item.machine.name}</td>
+      <td class="num" style="color:var(--text-dim)">${item.from.toLocaleString()}</td>
+      <td class="num" style="color:var(--text-dim)">${item.to.toLocaleString()}</td>
+      <td class="num" style="font-weight:500">+${item.diff}</td>
+      <td class="num" style="font-weight:600">NT$${item.revenue.toLocaleString()}</td>
+      <td class="num" style="color:var(--text-dim)">${pct}%</td>
+    `;
+    body.appendChild(tr);
+  });
+
+  const tr = document.createElement('tr');
+  tr.className = 'total-row';
+  tr.innerHTML = `
+    <td>合計</td><td></td><td></td>
+    <td class="num">+${data.totalCounts}</td>
+    <td class="num">NT$${data.totalRevenue.toLocaleString()}</td>
+    <td class="num">100%</td>
+  `;
+  body.appendChild(tr);
+}
+
+// ============================================================
+// 渲染：機台設定
+// ============================================================
+function renderMachineConfig() {
+  const wrap = document.getElementById('machine-config');
+  wrap.innerHTML = '';
+  state.machines.forEach((m, idx) => {
+    const row = document.createElement('div');
+    row.className = 'machine-row';
+    const pillLabel = m.group === 'left' ? '左' : m.group === 'right' ? '右' : '大';
+    row.innerHTML = `
+      <span class="group-pill group-${m.group}">${pillLabel}</span>
+      <input class="config-input" value="${m.name}" data-idx="${idx}" data-field="name">
+      <select class="config-input" data-idx="${idx}" data-field="group" style="max-width:90px">
+        <option value="left" ${m.group==='left'?'selected':''}>左邊</option>
+        <option value="right" ${m.group==='right'?'selected':''}>右邊</option>
+        <option value="big" ${m.group==='big'?'selected':''}>大機台</option>
+      </select>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+function saveConfig() {
+  state.storeName = document.getElementById('cfg-store').value || '門市';
+  state.pricePerCount = Math.max(1, parseInt(document.getElementById('cfg-price').value) || 10);
+  document.querySelectorAll('#machine-config [data-idx]').forEach(el => {
+    const idx = parseInt(el.dataset.idx);
+    const field = el.dataset.field;
+    state.machines[idx][field] = el.value;
+  });
+  save();
+  renderAll();
+  toast('設定已儲存');
+}
+
+// ============================================================
+// 動作：新增一期讀數
+// ============================================================
+function addReading() {
+  const sr = sortedReadings();
+  const lastDate = sr.length ? sr[sr.length - 1].date : new Date().toISOString().slice(0, 10);
+  const next = new Date(lastDate);
+  next.setDate(next.getDate() + 1);
+  const newDate = next.toISOString().slice(0, 10);
+
+  // 預填上一期的讀數作為起始值
+  const lastValues = sr.length ? sr[sr.length - 1].values : {};
+  const newValues = {};
+  state.machines.forEach(m => { newValues[m.id] = lastValues[m.id] ?? 0; });
+
+  state.readings.push({ date: newDate, values: newValues });
+  save();
+  renderAll();
+  toast('已新增一期，請輸入新讀數');
+}
+
+// ============================================================
+// 動作：匯出 / 匯入
+// ============================================================
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `claw-machine-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('已匯出 JSON 備份');
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data.machines || !data.readings) throw new Error('格式不正確');
+      state = data;
+      state.activeSeg = 'total';
+      save();
+      renderAll();
+      toast('匯入成功');
+    } catch (err) {
+      toast('匯入失敗：' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function resetAll() {
+  if (!confirm('確定要清除所有資料，回復為預設值嗎？此動作無法復原。')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = load();
+  renderAll();
+  toast('已重置為預設資料');
+}
+
+// ============================================================
+// 總渲染
+// ============================================================
+function renderAll() {
+  document.getElementById('price-display').textContent = state.pricePerCount;
+  document.getElementById('store-name').textContent = state.storeName;
+  document.getElementById('cfg-store').value = state.storeName;
+  document.getElementById('cfg-price').value = state.pricePerCount;
+  document.title = state.storeName + '娃娃機計數器';
+  renderCards();
+  renderSegs();
+  renderChart();
+  renderReadings();
+  renderDetail();
+  renderMachineConfig();
+}
+
+// 初始化
+renderAll();
+</script>
+</body>
+</html>
